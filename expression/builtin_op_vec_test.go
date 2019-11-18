@@ -18,6 +18,7 @@ import (
 
 	. "github.com/pingcap/check"
 	"github.com/pingcap/parser/ast"
+	"github.com/pingcap/parser/mysql"
 	"github.com/pingcap/tidb/types"
 )
 
@@ -63,6 +64,12 @@ var vecBuiltinOpCases = map[string][]vecExprBenchCase{
 	},
 	ast.UnaryMinus: {
 		{retEvalType: types.ETReal, childrenTypes: []types.EvalType{types.ETReal}},
+		/*
+			{retEvalType: types.ETInt, childrenTypes: []types.EvalType{types.ETInt},
+				childrenFieldTypes: []*types.FieldType{{Tp: mysql.TypeLonglong}}},
+		*/
+		{retEvalType: types.ETInt, childrenTypes: []types.EvalType{types.ETInt},
+			childrenFieldTypes: []*types.FieldType{{Tp: mysql.TypeLonglong, Flag: mysql.UnsignedFlag}}},
 	},
 	ast.IsNull: {
 		{retEvalType: types.ETInt, childrenTypes: []types.EvalType{types.ETReal}},

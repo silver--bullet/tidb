@@ -14,9 +14,12 @@
 package expression
 
 import (
+	"fmt"
 	"github.com/pingcap/errors"
+	"github.com/pingcap/parser/mysql"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
+	"math"
 )
 
 func (b *builtinTimeIsNullSig) vectorized() bool {
@@ -454,11 +457,57 @@ func (b *builtinRealIsFalseSig) vecEvalInt(input *chunk.Chunk, result *chunk.Col
 }
 
 func (b *builtinUnaryMinusIntSig) vectorized() bool {
-	return false
+	return true
 }
 
 func (b *builtinUnaryMinusIntSig) vecEvalInt(input *chunk.Chunk, result *chunk.Column) error {
-	return errors.Errorf("not implemented")
+	n := input.NumRows()
+	buf, err := b.bufAllocator.get(types.ETInt, n)
+	if err != nil {
+		return err
+	}
+	defer b.bufAllocator.put(buf)
+
+	if err = b.args[0].VecEvalInt(b.ctx, input, buf); err != nil {
+		return err
+	}
+
+	int64s := buf.Int64s()
+
+	result.ResizeInt64(n, false)
+	result.MergeNulls(buf)
+	i64s := result.Int64s()
+	if mysql.HasUnsignedFlag(b.args[0].GetType().Flag) {
+		for i := 0; i < n; i++ {
+			if result.IsNull(i) {
+				continue
+			}
+			ui64 := uint64(int64s[i])
+			if ui64 > uint64(-math.MinInt64) {
+				i64s[i] = 0
+				fmt.Printf("int %v uint %v", int64s[i], ui64)
+				return types.ErrOverflow.GenWithStackByArgs("YBIGINT", fmt.Sprintf("-%v", ui64))
+			} else if ui64 == uint64(-math.MinInt64) {
+				i64s[i] = math.MinInt64
+			} else {
+				i64s[i] = -int64s[i]
+			}
+
+		}
+	} else {
+		for i := 0; i < n; i++ {
+			if result.IsNull(i) {
+				continue
+			}
+			if int64s[i] == math.MinInt64 {
+				i64s[i] = 0
+				return types.ErrOverflow.GenWithStackByArgs("XBIGINT", fmt.Sprintf("-%v", int64s[i]))
+			} else {
+				i64s[i] = -int64s[i]
+			}
+		}
+	}
+	return nil
 }
 
 func (b *builtinUnaryNotDecimalSig) vectorized() bool {
