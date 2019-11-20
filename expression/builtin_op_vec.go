@@ -472,29 +472,28 @@ func (b *builtinUnaryMinusIntSig) vecEvalInt(input *chunk.Chunk, result *chunk.C
 		return err
 	}
 
-	int64s := buf.Int64s()
-
 	result.ResizeInt64(n, false)
 	result.MergeNulls(buf)
 	i64s := result.Int64s()
 	if mysql.HasUnsignedFlag(b.args[0].GetType().Flag) {
+		uint64s := buf.Uint64s()
 		for i := 0; i < n; i++ {
 			if result.IsNull(i) {
 				continue
 			}
-			ui64 := uint64(int64s[i])
+			ui64 := uint64s[i]
 			if ui64 > uint64(-math.MinInt64) {
 				i64s[i] = 0
-				fmt.Printf("int %v uint %v", int64s[i], ui64)
 				return types.ErrOverflow.GenWithStackByArgs("YBIGINT", fmt.Sprintf("-%v", ui64))
 			} else if ui64 == uint64(-math.MinInt64) {
 				i64s[i] = math.MinInt64
 			} else {
-				i64s[i] = -int64s[i]
+				i64s[i] = int64(-ui64)
 			}
 
 		}
 	} else {
+		int64s := buf.Int64s()
 		for i := 0; i < n; i++ {
 			if result.IsNull(i) {
 				continue
